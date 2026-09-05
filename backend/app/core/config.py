@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     AUTH_LOGIN_RATE_LIMIT_REQUESTS: int = 10
     AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
     
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:5173"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://ai-agent-hack-with-amypo.vercel.app"
 
     # ── Phase 5: Machine Learning Evaluation & Governance ─────────────────────
     ML_MODEL_VERSION: str = "1.0.0"
