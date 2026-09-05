@@ -9,7 +9,9 @@ class AuraVectorizer:
         self._use_fastembed = False
         self._model = None
 
-        # Enforce PyTorch CPU single-threaded allocations early
+        # Enforce PyTorch CPU single-threaded allocations and disable TF early
+        os.environ["USE_TF"] = "0"
+        os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
         os.environ["OMP_NUM_THREADS"] = "1"
         os.environ["MKL_NUM_THREADS"] = "1"
         os.environ["OPENBLAS_NUM_THREADS"] = "1"

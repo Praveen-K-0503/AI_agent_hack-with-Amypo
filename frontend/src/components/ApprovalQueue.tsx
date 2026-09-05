@@ -8,7 +8,7 @@ import { getApiUrl } from "../config";
 
 interface ApprovalQueueProps {
   queue: ApprovalRequest[];
-  onResolve?: (approvalId: string) => void;
+  onResolve?: (approvalId: string, status: "approved" | "rejected") => void;
 }
 
 export const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ queue, onResolve }) => {
@@ -27,7 +27,7 @@ export const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ queue, onResolve }
         headers: { Authorization: `Bearer ${token}` }
       });
       if (onResolve) {
-        onResolve(approvalId);
+        onResolve(approvalId, status);
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || "Failed to resolve approval request");
@@ -42,8 +42,10 @@ export const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ queue, onResolve }
         <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mb-4">
           <Check className="w-8 h-8 text-green-500" />
         </div>
-        <p className="font-semibold text-lg text-gray-200">Approval Queue Clean</p>
-        <p className="text-sm mt-1">No pending AI agent actions require human review.</p>
+        <p className="font-semibold text-base text-gray-200">Authorization Queue Clear</p>
+        <p className="text-xs text-center mt-1" style={{ color: "var(--text-muted)" }}>
+          All agent actions evaluated. Zero pending operations requiring operator sign-off.
+        </p>
       </div>
     );
   }
@@ -51,11 +53,11 @@ export const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ queue, onResolve }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          <ShieldAlert className="text-amber-500 w-6 h-6 animate-pulse" />
-          Pending Approvals
-          <span className="text-xs bg-amber-500/20 text-amber-500 font-semibold px-2.5 py-0.5 rounded-full">
-            {queue.length} Required
+        <h3 className="text-base font-bold flex items-center gap-2">
+          <ShieldAlert className="text-amber-500 w-5 h-5 animate-pulse" />
+          Human-in-the-Loop Review Queue
+          <span className="text-xs bg-amber-500/20 text-amber-500 font-semibold px-2 py-0.5 rounded-full">
+            {queue.length} Pending
           </span>
         </h3>
         {error && <span className="text-xs text-red-500">{error}</span>}

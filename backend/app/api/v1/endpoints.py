@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Query, Depends, WebSocket, WebSocketDisconnect, HTTPException, Response, Header
@@ -122,8 +123,15 @@ async def get_health(db: Session = Depends(get_db)):
 
     auth_status = "enabled" if settings.AUTH_ENABLED else "disabled"
 
+    try:
+        from app.qa.answering import get_answering_engine
+        model_ready = get_answering_engine().is_ready()
+    except Exception:
+        model_ready = False
+
     return {
         "status": "ok",
+        "model_ready": model_ready,
         "timestamp": datetime.now(timezone.utc),
         "services": {
             "database": db_status,
@@ -363,8 +371,7 @@ async def evaluate_action(
                 window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
             )
         except RateLimitRedisError:
-            import sys
-            is_testing = "pytest" in sys.modules or "unittest" in sys.modules
+            is_testing = "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "test"
             if not is_testing:
                 logger.warning("Redis rate limiter offline. Bypassing rate limiting.")
                 http_response.headers["X-RateLimit-Limit"] = "100"
@@ -550,7 +557,26 @@ async def evaluate_action(
         policy_version=policy_engine.version
     ).inc()
 
-    # ── STEP 8: WebSocket broadcast for pending approvals ─────────────────────
+    # ── STEP 8: WebSocket broadcast for live audit & pending approvals ────────
+    ws_log_payload = {
+        "event": "action_evaluated",
+        "data": {
+            "id": action_log.id,
+            "agent_id": agent.id,
+            "action": request.action,
+            "parameters": request.parameters,
+            "risk_level": risk_level,
+            "decision": final_decision,
+            "reason": reason,
+            "requested_at": requested_dt.isoformat(),
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+            "model_version": risk_engine.model_version,
+            "policy_version": policy_engine.version,
+            "request_id": request_id_ctx_var.get()
+        }
+    }
+    await manager.broadcast(ws_log_payload)
+
     if final_decision == "require_human_approval":
         pending = PendingApproval(action_log_id=action_log.id, status="pending")
         db.add(pending)
@@ -581,6 +607,149 @@ async def evaluate_action(
     )
 
 
+# ── Pending Approvals Query (Populates live queue on mount) ───────────────────
+@router.get("/approvals/pending")
+def get_pending_approvals(db: Session = Depends(get_db)):
+    """Fetch all currently pending approvals joined with their action log details."""
+    pending_list = db.query(PendingApproval).filter(PendingApproval.status == "pending").order_by(PendingApproval.created_at.desc()).all()
+    results = []
+    for p in pending_list:
+        action_log = db.query(ActionLog).filter(ActionLog.id == p.action_log_id).first()
+        results.append({
+            "approval_id": p.id,
+            "agent_id": action_log.agent_id if action_log else "unknown_agent",
+            "action": action_log.action if action_log else "unknown_action",
+            "parameters": action_log.parameters if action_log else {},
+            "risk_level": action_log.risk_level if action_log else "medium",
+            "reason": action_log.reason if action_log else "Requires human review",
+            "requested_at": action_log.requested_at.isoformat() if (action_log and action_log.requested_at) else None
+        })
+    return results
+
+
+# ── Interactive Sandbox Action Simulation (Live Dashboard Impact) ─────────────
+@router.post("/actions/simulate", response_model=ActionEvaluationResponse)
+async def simulate_action(
+    request: ActionEvaluationRequest,
+    db: Session = Depends(get_db),
+    risk_engine: RiskEngine = Depends(get_risk_engine),
+    policy_engine: PolicyEngine = Depends(get_policy_engine),
+):
+    """
+    Simulates an agent action from the interactive sandbox.
+    Runs the real RiskEngine and RBAC PolicyEngine, saves the evaluation into ActionLog,
+    creates a PendingApproval if high risk, and broadcasts to WebSocket in real time.
+    """
+    effective_agent_id = request.agent_id or "sandbox_agent"
+    effective_role = resolve_role(effective_agent_id)
+
+    # 1. Deterministic threat pre-filter
+    deterministic_block = risk_engine._deterministic_pre_filter(request.action, request.parameters)
+    if deterministic_block:
+        risk_level, raw_decision, risk_reason = deterministic_block
+        policy_decision, policy_reason = "block", "AURA Deterministic Catastrophic Threat Intercept"
+        final_decision = "block"
+        reason = f"{risk_reason} | {policy_reason}"
+    else:
+        # 2. ML Risk Engine
+        try:
+            risk_level, raw_decision, risk_reason = risk_engine.evaluate(
+                request.action,
+                request.parameters,
+                agent_id=effective_agent_id
+            )
+        except Exception as e:
+            logger.warning(f"ML evaluation fallback in simulation: {e}")
+            risk_level, raw_decision, risk_reason = "high", "block", f"Evaluation exception: {e}"
+
+        # 3. Policy Engine
+        if raw_decision == "block":
+            final_decision = "block"
+            policy_reason = None
+        else:
+            final_decision, policy_reason = policy_engine.evaluate(
+                effective_role,
+                request.action,
+                risk_level
+            )
+        reason = f"{risk_reason} | {policy_reason}" if policy_reason else risk_reason
+
+    # 4. Parse timestamp
+    try:
+        requested_dt = datetime.fromisoformat(request.requested_at.replace("Z", "+00:00"))
+    except Exception:
+        requested_dt = datetime.now(timezone.utc)
+
+    # 5. Persist to ActionLog for live auditability
+    action_log = ActionLog(
+        agent_id=effective_agent_id,
+        action=request.action,
+        parameters=request.parameters,
+        risk_level=risk_level,
+        decision=final_decision,
+        reason=reason,
+        requested_at=requested_dt,
+        model_version=risk_engine.model_version,
+        feature_schema_version=1,
+        policy_version=policy_engine.version,
+        request_id=request_id_ctx_var.get(),
+        evaluation_timestamp=datetime.now(timezone.utc)
+    )
+    db.add(action_log)
+    db.commit()
+    db.refresh(action_log)
+
+    # 6. Broadcast evaluated action to WebSocket
+    ws_log_payload = {
+        "event": "action_evaluated",
+        "data": {
+            "id": action_log.id,
+            "agent_id": effective_agent_id,
+            "action": request.action,
+            "parameters": request.parameters,
+            "risk_level": risk_level,
+            "decision": final_decision,
+            "reason": reason,
+            "requested_at": requested_dt.isoformat(),
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+            "model_version": risk_engine.model_version,
+            "policy_version": policy_engine.version,
+            "request_id": request_id_ctx_var.get()
+        }
+    }
+    await manager.broadcast(ws_log_payload)
+
+    # 7. If require_human_approval, create real PendingApproval & broadcast
+    if final_decision == "require_human_approval":
+        pending = PendingApproval(action_log_id=action_log.id, status="pending")
+        db.add(pending)
+        db.commit()
+        db.refresh(pending)
+
+        ws_payload = {
+            "event": "new_approval_request",
+            "data": {
+                "approval_id": pending.id,
+                "agent_id": effective_agent_id,
+                "action": request.action,
+                "parameters": request.parameters,
+                "risk_level": risk_level,
+                "reason": reason
+            }
+        }
+        await manager.broadcast(ws_payload)
+
+    return ActionEvaluationResponse(
+        decision=final_decision,
+        risk_level=risk_level,
+        reason=reason,
+        model_version=risk_engine.model_version,
+        feature_schema_version=1,
+        policy_version=policy_engine.version,
+        request_id=request_id_ctx_var.get()
+    )
+
+
 # ── Approval resolution ───────────────────────────────────────────────────────
 @router.post("/approve-action", response_model=ApprovalResolutionResponse)
 async def approve_action(
@@ -595,11 +764,9 @@ async def approve_action(
     pending.status = request.status
 
     action_log = db.query(ActionLog).filter(ActionLog.id == pending.action_log_id).first()
+    resolved_decision = "allow" if request.status == "approved" else "block"
     if action_log:
-        if request.status == "approved":
-            action_log.decision = "allow"
-        elif request.status == "rejected":
-            action_log.decision = "block"
+        action_log.decision = resolved_decision
         db.add(action_log)
 
     db.add(pending)
@@ -613,7 +780,9 @@ async def approve_action(
         "event": "approval_resolved",
         "data": {
             "approval_id": request.approval_id,
-            "status": request.status
+            "action_log_id": pending.action_log_id,
+            "status": request.status,
+            "decision": resolved_decision
         }
     }
     await manager.broadcast(ws_payload)

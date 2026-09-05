@@ -39,11 +39,24 @@ export function useAuditLogs(agentId?: string, pollIntervalMs = 4000) {
     }
   };
 
+  const prependLog = (newLog: AuditLogItem) => {
+    setLogs(prev => {
+      if (prev.some(item => item.id === newLog.id)) {
+        return prev.map(item => item.id === newLog.id ? newLog : item);
+      }
+      return [newLog, ...prev];
+    });
+  };
+
+  const updateLogDecision = (actionLogId: string, decision: string) => {
+    setLogs(prev => prev.map(item => item.id === actionLogId ? { ...item, decision } : item));
+  };
+
   useEffect(() => {
     fetchLogs();
     const interval = setInterval(fetchLogs, pollIntervalMs);
     return () => clearInterval(interval);
   }, [agentId, pollIntervalMs]);
 
-  return { logs, loading, error, refetch: fetchLogs };
+  return { logs, setLogs, prependLog, updateLogDecision, loading, error, refetch: fetchLogs };
 }

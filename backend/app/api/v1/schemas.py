@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
+    model_ready: bool = True
     services: Dict[str, str] = Field(default_factory=dict)
 
 

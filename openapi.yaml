@@ -164,6 +164,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/agents/{agent_id}/quarantine:
+    post:
+      tags:
+      - Agent Management
+      summary: Quarantine Agent
+      description: Quarantine an agent and revoke all its active credentials, linking
+        to an incident.
+      operationId: quarantine_agent_api_v1_agents__agent_id__quarantine_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/models:
     get:
       tags:
@@ -178,7 +214,6 @@ paths:
             application/json:
               schema:
                 items:
-                  additionalProperties: true
                   type: object
                 type: array
                 title: Response List Models Api V1 Models Get
@@ -197,7 +232,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 type: object
                 title: Response Get Model Health Api V1 Models Health Get
       security:
@@ -225,7 +259,6 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
                 title: Response Get Model Details Api V1 Models  Model Version  Get
         '422':
           description: Validation Error
@@ -256,7 +289,6 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
                 title: Response Activate Model Api V1 Models  Model Version  Activate
                   Post
         '422':
@@ -278,11 +310,346 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 type: object
                 title: Response Rollback Model Api V1 Models Rollback Post
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/models/emergency-retire:
+    post:
+      tags:
+      - Model Governance
+      summary: Emergency Retire
+      description: Immediately retire the active model and fallback to known-good
+        or lockdown.
+      operationId: emergency_retire_api_v1_models_emergency_retire_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Emergency Retire Api V1 Models Emergency Retire Post
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/security/lockdown:
+    post:
+      tags:
+      - Security Operations
+      summary: Trigger Lockdown
+      description: Trigger a global system lockdown. Fails closed all evaluate-action
+        operations.
+      operationId: trigger_lockdown_api_v1_security_lockdown_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Trigger Lockdown Api V1 Security Lockdown Post
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/security/unlock:
+    post:
+      tags:
+      - Security Operations
+      summary: Release Lockdown
+      description: Release system lockdown and restore normal safety checks.
+      operationId: release_lockdown_api_v1_security_unlock_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Release Lockdown Api V1 Security Unlock Post
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/security/status:
+    get:
+      tags:
+      - Security Operations
+      summary: Get Lockdown Status
+      description: Retrieve the current lockdown state of the security platform.
+      operationId: get_lockdown_status_api_v1_security_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Lockdown Status Api V1 Security Status Get
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/security/audit/verify:
+    get:
+      tags:
+      - Security Operations
+      summary: Verify Audit Logs
+      description: Verify cryptographic integrity of the security audit log chain.
+      operationId: verify_audit_logs_api_v1_security_audit_verify_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Verify Audit Logs Api V1 Security Audit Verify Get
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/security/audit/export:
+    get:
+      tags:
+      - Security Operations
+      summary: Export Audit Logs
+      description: Export paginated compliance-audited security events.
+      operationId: export_audit_logs_api_v1_security_audit_export_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: start_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: ISO format start datetime filter
+          title: Start Time
+        description: ISO format start datetime filter
+      - name: end_time
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: ISO format end datetime filter
+          title: End Time
+        description: ISO format end datetime filter
+      - name: severity
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Severity category filter
+          title: Severity
+        description: Severity category filter
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Event classification filter
+          title: Event Type
+        description: Event classification filter
+      - name: agent_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Target agent filter
+          title: Agent Id
+        description: Target agent filter
+      - name: incident_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Linked incident filter
+          title: Incident Id
+        description: Linked incident filter
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Page index
+          default: 1
+          title: Page
+        description: Page index
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          description: Items per page
+          default: 100
+          title: Limit
+        description: Items per page
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Export Audit Logs Api V1 Security Audit Export Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/incidents:
+    get:
+      tags:
+      - Incident Response
+      summary: List Incidents
+      description: Retrieve all logged security incidents.
+      operationId: list_incidents_api_v1_incidents_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/IncidentResponse'
+                type: array
+                title: Response List Incidents Api V1 Incidents Get
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Incident Response
+      summary: Create Incident
+      description: Declare a new security operational incident.
+      operationId: create_incident_api_v1_incidents_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/incidents/{incident_id}:
+    get:
+      tags:
+      - Incident Response
+      summary: Get Incident
+      description: Get detail specifications of a single security incident.
+      operationId: get_incident_api_v1_incidents__incident_id__get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: incident_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Incident Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Incident Response
+      summary: Update Incident
+      description: Modify details, ownership, or status of an incident.
+      operationId: update_incident_api_v1_incidents__incident_id__patch
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: incident_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Incident Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/incidents/{incident_id}/resolve:
+    post:
+      tags:
+      - Incident Response
+      summary: Resolve Incident
+      description: Transition an incident state to resolved.
+      operationId: resolve_incident_api_v1_incidents__incident_id__resolve_post
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: incident_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Incident Id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              title: Notes
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/health:
     get:
       summary: Get Health
@@ -292,7 +659,8 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
   /api/v1/readiness:
     get:
       summary: Get Readiness
@@ -455,6 +823,112 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       security:
       - OAuth2PasswordBearer: []
+  /api/v1/ask:
+    post:
+      tags:
+      - Question Answering & Placement
+      summary: Ask a question over AMYPO database & institutional knowledge
+      description: Natural language Q&A with mandatory in-line AURA safety evaluation
+        and zero-hallucination grounding.
+      operationId: ask_question_api_v1_ask_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/placement/students:
+    get:
+      tags:
+      - Question Answering & Placement
+      summary: Get all 30 AMYPO students
+      description: Returns directory of students with GPA, attendance, verified skills,
+        and coding scores.
+      operationId: get_students_api_v1_placement_students_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v1/placement/companies:
+    get:
+      tags:
+      - Question Answering & Placement
+      summary: Get all 10 recruiting companies
+      description: Returns company hiring criteria, min GPA, min attendance, and required
+        tech stacks.
+      operationId: get_companies_api_v1_placement_companies_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v1/placement/match:
+    get:
+      tags:
+      - Question Answering & Placement
+      summary: Evaluate placement eligibility with exact mathematical formula
+      description: 'Formula: Eligibility = (Normalized GPA * 0.40) + (Skills Match
+        % * 0.60). Recommends gap courses if < 60%.'
+      operationId: match_placement_api_v1_placement_match_get
+      parameters:
+      - name: student_id
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Student ID e.g. STU001
+          title: Student Id
+        description: Student ID e.g. STU001
+      - name: company_id
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Company ID e.g. CMP001
+          title: Company Id
+        description: Company ID e.g. CMP001
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacementMatchResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/placement/gap-courses:
+    get:
+      tags:
+      - Question Answering & Placement
+      summary: Get all available skill gap remediation courses
+      description: Lists the hypothetical course catalog used for student skill remediation.
+      operationId: get_gap_courses_api_v1_placement_gap_courses_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
 components:
   schemas:
     ActionEvaluationRequest:
@@ -468,7 +942,6 @@ components:
           title: Action
           description: Action name or type being attempted
         parameters:
-          additionalProperties: true
           type: object
           title: Parameters
           description: Parameters associated with the action
@@ -637,6 +1110,44 @@ components:
       - approval_id
       - resolution
       title: ApprovalResolutionResponse
+    AskRequest:
+      properties:
+        question:
+          type: string
+          title: Question
+          description: Natural language question from student or staff
+        user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Id
+          description: Optional user or agent identifier
+      type: object
+      required:
+      - question
+      title: AskRequest
+    AskResponse:
+      properties:
+        answer:
+          type: string
+          title: Answer
+          description: Grounded natural language answer
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceItem'
+          type: array
+          title: Sources
+          description: Strict source citations with record_id and snippet
+        confidence:
+          type: number
+          title: Confidence
+          description: Cosine similarity confidence score between 0.0 and 1.0
+      type: object
+      required:
+      - answer
+      - sources
+      - confidence
+      title: AskResponse
     AuditLogItem:
       properties:
         id:
@@ -649,7 +1160,6 @@ components:
           type: string
           title: Action
         parameters:
-          additionalProperties: true
           type: object
           title: Parameters
         requested_at:
@@ -709,7 +1219,7 @@ components:
         grant_type:
           anyOf:
           - type: string
-            pattern: ^password$
+            pattern: password
           - type: 'null'
           title: Grant Type
         username:
@@ -717,7 +1227,6 @@ components:
           title: Username
         password:
           type: string
-          format: password
           title: Password
         scope:
           type: string
@@ -732,7 +1241,6 @@ components:
           anyOf:
           - type: string
           - type: 'null'
-          format: password
           title: Client Secret
       type: object
       required:
@@ -757,6 +1265,10 @@ components:
           type: string
           format: date-time
           title: Timestamp
+        model_ready:
+          type: boolean
+          title: Model Ready
+          default: true
         services:
           additionalProperties:
             type: string
@@ -767,6 +1279,145 @@ components:
       - status
       - timestamp
       title: HealthResponse
+    IncidentCreate:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 3
+          title: Title
+        description:
+          type: string
+          minLength: 5
+          title: Description
+        severity:
+          type: string
+          pattern: ^(low|medium|high|critical)$
+          title: Severity
+          default: medium
+        affected_agent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Agent Id
+        affected_model_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Model Version
+        affected_policy_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Policy Version
+      type: object
+      required:
+      - title
+      - description
+      title: IncidentCreate
+    IncidentResponse:
+      properties:
+        incident_id:
+          type: string
+          title: Incident Id
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        severity:
+          type: string
+          title: Severity
+        status:
+          type: string
+          title: Status
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+        resolved_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolved At
+        created_by:
+          type: string
+          title: Created By
+        assigned_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned To
+        affected_agent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Agent Id
+        affected_model_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Model Version
+        affected_policy_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Affected Policy Version
+        resolution_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolution Notes
+      type: object
+      required:
+      - incident_id
+      - title
+      - description
+      - severity
+      - status
+      - created_at
+      - updated_at
+      - created_by
+      title: IncidentResponse
+    IncidentUpdate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        severity:
+          anyOf:
+          - type: string
+            pattern: ^(low|medium|high|critical)$
+          - type: 'null'
+          title: Severity
+        status:
+          anyOf:
+          - type: string
+            pattern: ^(open|investigating|contained|resolved|closed)$
+          - type: 'null'
+          title: Status
+        assigned_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assigned To
+        resolution_notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolution Notes
+      type: object
+      title: IncidentUpdate
     OperatorLoginResponse:
       properties:
         access_token:
@@ -784,6 +1435,100 @@ components:
       - access_token
       - role
       title: OperatorLoginResponse
+    PlacementMatchResponse:
+      properties:
+        student_id:
+          type: string
+          title: Student Id
+        student_name:
+          type: string
+          title: Student Name
+        student_gpa:
+          type: number
+          title: Student Gpa
+        student_attendance:
+          type: number
+          title: Student Attendance
+        company_id:
+          type: string
+          title: Company Id
+        company_name:
+          type: string
+          title: Company Name
+        target_role:
+          type: string
+          title: Target Role
+        package_lpa:
+          type: number
+          title: Package Lpa
+        normalized_gpa:
+          type: number
+          title: Normalized Gpa
+        skills_match_pct:
+          type: number
+          title: Skills Match Pct
+        eligibility_score:
+          type: number
+          title: Eligibility Score
+        is_eligible:
+          type: boolean
+          title: Is Eligible
+        meets_gpa_cutoff:
+          type: boolean
+          title: Meets Gpa Cutoff
+        meets_attendance_cutoff:
+          type: boolean
+          title: Meets Attendance Cutoff
+        matched_skills:
+          items:
+            type: string
+          type: array
+          title: Matched Skills
+        missing_skills:
+          items:
+            type: string
+          type: array
+          title: Missing Skills
+        gap_courses:
+          items:
+            type: object
+          type: array
+          title: Gap Courses
+      type: object
+      required:
+      - student_id
+      - student_name
+      - student_gpa
+      - student_attendance
+      - company_id
+      - company_name
+      - target_role
+      - package_lpa
+      - normalized_gpa
+      - skills_match_pct
+      - eligibility_score
+      - is_eligible
+      - meets_gpa_cutoff
+      - meets_attendance_cutoff
+      - matched_skills
+      - missing_skills
+      - gap_courses
+      title: PlacementMatchResponse
+    SourceItem:
+      properties:
+        record_id:
+          type: string
+          title: Record Id
+          description: Unique identifier of the cited source record
+        snippet:
+          type: string
+          title: Snippet
+          description: Verbatim extracted snippet from the source document
+      type: object
+      required:
+      - record_id
+      - snippet
+      title: SourceItem
     ValidationError:
       properties:
         loc:
@@ -799,11 +1544,6 @@ components:
         type:
           type: string
           title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
       type: object
       required:
       - loc

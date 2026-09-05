@@ -10,6 +10,7 @@ export interface HealthStatus {
     redis: string;
     authentication: string;  // Phase 2: "enabled" | "disabled"
   };
+  model_ready?: boolean;
 }
 
 export function useHealth(intervalMs = 5000) {

@@ -222,6 +222,9 @@ class RiskEngine:
             r"rm\s+-rf": "Blocked execution of potentially catastrophic file deletion command (rm -rf).",
             r"drop\s+table": "Blocked SQL injection attempt: database table destruction command (DROP TABLE) detected.",
             r"/etc/passwd": "Blocked unauthorized local file inclusion/access attempt to system passwd file (/etc/passwd).",
+            r"/etc/shadow": "Blocked unauthorized access attempt to system shadow file (/etc/shadow).",
+            r"(wget|curl)\s+.*\|\s*(ba)?sh": "Blocked remote script download and shell execution pipe.",
+            r"execute_bash": "Blocked arbitrary bash execution in student query.",
             r"format\s+[a-zA-Z]:": "Blocked drive formatting request."
         }
         

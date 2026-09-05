@@ -1,4 +1,6 @@
 import os
+os.environ["USE_TF"] = "0"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -25,6 +27,7 @@ from app.core.database import engine, Base, get_db
 from app.core.config import settings
 from app.core.logging import configure_logging, request_id_ctx_var
 import app.models
+import app.qa.models
 from app.api.v1.endpoints import router as api_v1_router
 
 
@@ -329,6 +332,14 @@ async def lifespan(app: FastAPI):
     from app.core.websockets import start_pubsub_listener
     start_pubsub_listener()
 
+    # 5. Seed QA and Placement Knowledge Base
+    with next(get_db()) as db:
+        try:
+            from app.qa.seed_data import seed_qa_data
+            seed_qa_data(db)
+        except Exception as e:
+            print(f"[AURA] Warning: Error seeding QA data: {e}")
+
     yield
 
 configure_logging()
@@ -368,3 +379,5 @@ app.add_middleware(
 )
 
 app.include_router(api_v1_router, prefix="/api/v1")
+from app.api.v1.qa_endpoints import router as qa_router
+app.include_router(qa_router, prefix="/api/v1")

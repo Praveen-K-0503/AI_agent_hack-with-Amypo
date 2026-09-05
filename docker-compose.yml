@@ -58,6 +58,7 @@ services:
       - CORS_ALLOWED_ORIGINS=http://localhost:5173
     volumes:
       - ./backend:/app
+      - ./models:/app/models
     depends_on:
       postgres:
         condition: service_healthy

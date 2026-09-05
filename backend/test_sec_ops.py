@@ -73,7 +73,7 @@ def setup_module():
         db.add(reviewer)
 
         # Use real active model paths
-        real_ubj = "app/ml/registry/aura-risk-model_1.0.0.ubj"
+        real_ubj = os.path.join(os.path.dirname(__file__), "app", "ml", "registry", "aura-risk-model_1.0.0.ubj")
         
         import hashlib
         def get_sha255(path):

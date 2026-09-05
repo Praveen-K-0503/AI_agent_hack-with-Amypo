@@ -5,6 +5,12 @@ roles:
       - read_file
       - scrape_web
       - check_status
+      - get_health
+      - view_profile
+      - get_version
+      - get_billing
+      - view_dashboard
+      - search_products
     max_risk_allowed: low
     explicit_blocked_actions:
       - execute_bash
@@ -17,6 +23,10 @@ roles:
       - write_file
       - execute_bash
       - write_config
+      - list_directory
+      - read_log
+      - get_health
+      - check_status
     max_risk_allowed: medium
     explicit_blocked_actions:
       - delete_database
@@ -30,5 +40,23 @@ roles:
       - write_config
       - delete_database
       - restart_service
+      - check_status
+      - list_directory
+      - read_log
+      - get_health
     max_risk_allowed: high
     explicit_blocked_actions: []
+
+  StudentAgent:
+    allowed_actions:
+      - read_file
+      - query_database
+      - check_status
+      - get_health
+      - view_profile
+    max_risk_allowed: medium
+    explicit_blocked_actions:
+      - execute_bash
+      - execute_sql
+      - delete_database
+      - drop_table
