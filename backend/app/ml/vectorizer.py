@@ -24,6 +24,14 @@ class AuraVectorizer:
             return
         self._initialized = True
 
+        # In Render or memory-constrained cloud environments (512MB RAM ceiling),
+        # prevent loading heavy PyTorch/ONNX weights that trigger Linux kernel OOM killer.
+        is_cloud_constrained = os.environ.get("RENDER") == "true" or os.environ.get("LOW_RAM_MODE") == "1"
+        if is_cloud_constrained:
+            logger.info("AURA: Render cloud runtime detected (512MB RAM limit). Operating in high-speed zero-RAM mode.")
+            self._model = None
+            return
+
         # Try to load fastembed (ONNX runtime, uses low RAM footprint)
         try:
             from fastembed import TextEmbedding
