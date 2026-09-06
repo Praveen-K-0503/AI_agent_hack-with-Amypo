@@ -1,4 +1,15 @@
-from prometheus_client import Counter, Histogram, Gauge
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+except ImportError:
+    class _MockMetric:
+        def __init__(self, *args, **kwargs): pass
+        def labels(self, *args, **kwargs): return self
+        def inc(self, *args, **kwargs): pass
+        def set(self, *args, **kwargs): pass
+        def observe(self, *args, **kwargs): pass
+    Counter = _MockMetric
+    Histogram = _MockMetric
+    Gauge = _MockMetric
 
 # Existing metrics
 ml_inference_counter = Counter(

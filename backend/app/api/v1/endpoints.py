@@ -25,7 +25,11 @@ from app.models import Agent, ActionLog, PendingApproval, AgentCredential, Opera
 from app.ml.risk_engine import RiskEngine, RiskEngineError
 from app.policy.engine import PolicyEngine
 from app.core.websockets import manager
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+try:
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+except ImportError:
+    def generate_latest(): return b""
+    CONTENT_TYPE_LATEST = "text/plain"
 from app.core.logging import request_id_ctx_var
 import time
 
