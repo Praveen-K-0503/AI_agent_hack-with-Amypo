@@ -384,6 +384,7 @@ app.include_router(qa_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
+@app.head("/", tags=["Root"], include_in_schema=False)
 def root():
     return {
         "status": "online",
