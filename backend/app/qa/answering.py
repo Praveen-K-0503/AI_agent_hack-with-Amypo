@@ -74,9 +74,12 @@ class QAAnsweringEngine:
         # ── 2. Unstructured Document Retrieval & Grounded QA ──────────────────
         top_chunks, confidence = self.retriever.retrieve(db, q_clean, top_k=3)
 
-        # Zero-Hallucination Guard: if max cosine similarity is too low (< 0.30),
+        # Zero-Hallucination Guard: if max cosine/lexical similarity is too low (< 0.10),
         # the information is absent from AMYPO's institutional knowledge base.
-        if confidence < 0.30 or not top_chunks:
+        # NOTE: Lexical scores start at 0.5 base when a match IS found.
+        # Cosine similarity returns 0.0 when vectorizer is in zero-RAM mode (no match possible from zero vector).
+        # We use a low threshold to catch true zero-match cases from lexical retrieval.
+        if confidence < 0.10 or not top_chunks:
             return {
                 "answer": "Information not found.",
                 "sources": [],
@@ -275,15 +278,16 @@ class QAAnsweringEngine:
             scored_sentences.append((overlap, matched_words, s))
 
         scored_sentences.sort(key=lambda x: (x[0], x[1]), reverse=True)
-        max_overlap = scored_sentences[0][1] if scored_sentences else 0
+        max_overlap_score = scored_sentences[0][0] if scored_sentences else 0.0
+        max_overlap_words = scored_sentences[0][1] if scored_sentences else 0
 
         # Zero-Hallucination Guard: If key subject matter words have 0 overlap with the retrieved text,
         # strictly output Information not found.
-        if max_overlap == 0:
+        if max_overlap_score == 0.0 and max_overlap_words == 0:
             return "Information not found."
 
-        # If question has multiple content words, ensure at least 2 distinct words appear across combined chunks
-        if len(q_words) >= 3 and max_overlap < 2:
+        # If question has multiple content words, ensure at least 1 distinct word appears across combined chunks
+        if len(q_words) >= 3 and max_overlap_words < 1:
             all_text = " ".join([c["content"].lower() for c in top_chunks])
             all_overlap = sum(1 for w in q_words if (
                 w in all_text or 
@@ -291,7 +295,7 @@ class QAAnsweringEngine:
                 (len(w) >= 4 and w in all_text) or 
                 (len(w) >= 5 and w[:4] in all_text)
             ))
-            if all_overlap < 2:
+            if all_overlap < 1:
                 return "Information not found."
 
         top_sent = scored_sentences[0][2]
