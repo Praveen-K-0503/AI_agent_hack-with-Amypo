@@ -71,11 +71,26 @@ class QARetriever:
                 scores.append((sim, c))
         else:
             # Robust lexical keyword overlap fallback (zero RAM, high precision on 512MB RAM)
-            query_words = set(re.findall(r'\b[a-zA-Z0-9_]{3,}\b', query.lower()))
+            stop_words = {
+                "what", "is", "the", "for", "in", "to", "how", "are", "can", "a", "of", "and",
+                "amypo", "which", "who", "where", "why", "does", "explain", "about", "many", "under",
+                "with", "from", "tell", "anything", "any", "give", "me", "details", "info", "information",
+                "know", "please", "something", "talk", "share", "regarding", "say", "describe", "want"
+            }
+            raw_words = set(re.findall(r'\b[a-zA-Z0-9_]{3,}\b', query.lower()))
+            content_words = raw_words - stop_words
+            if not content_words:
+                content_words = raw_words
+            stems = {w[:-1] for w in content_words if w.endswith('s') and len(w) > 3}
+            search_terms = content_words.union(stems)
+
             for c in chunks:
                 text_to_match = (c["title"] + " " + c["content"]).lower()
-                matched = sum(1 for w in query_words if w in text_to_match)
-                sim = min(1.0, 0.5 + 0.1 * matched) if matched > 0 else 0.0
+                matched = sum(1 for w in search_terms if w in text_to_match)
+                # Boost if matched in title
+                title_lower = c["title"].lower()
+                title_matched = sum(1 for w in search_terms if w in title_lower)
+                sim = min(1.0, 0.5 + 0.15 * matched + 0.25 * title_matched) if matched > 0 else 0.0
                 scores.append((sim, c))
 
         # Sort by similarity descending
