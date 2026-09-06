@@ -1,4 +1,5 @@
 import json
+import re
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from sqlalchemy.orm import Session
@@ -50,17 +51,32 @@ class QARetriever:
         if not chunks:
             return [], 0.0
 
-        # Encode query
-        q_vec = self.vectorizer.encode([query])[0].astype(np.float32)
-        q_norm = np.linalg.norm(q_vec)
-        if q_norm > 0:
-            q_vec = q_vec / q_norm
+        # Encode query safely
+        q_norm = 0.0
+        q_vec = None
+        try:
+            raw_vec = self.vectorizer.encode([query])[0].astype(np.float32)
+            norm = float(np.linalg.norm(raw_vec))
+            if norm > 0:
+                q_vec = raw_vec / norm
+                q_norm = norm
+        except Exception:
+            q_norm = 0.0
 
         scores = []
-        for c in chunks:
-            # Cosine similarity between normalized vectors is dot product
-            sim = float(np.dot(q_vec, c["norm_embedding"]))
-            scores.append((sim, c))
+        if q_norm > 0 and q_vec is not None:
+            for c in chunks:
+                # Cosine similarity between normalized vectors is dot product
+                sim = float(np.dot(q_vec, c["norm_embedding"]))
+                scores.append((sim, c))
+        else:
+            # Robust lexical keyword overlap fallback (zero RAM, high precision on 512MB RAM)
+            query_words = set(re.findall(r'\b[a-zA-Z0-9_]{3,}\b', query.lower()))
+            for c in chunks:
+                text_to_match = (c["title"] + " " + c["content"]).lower()
+                matched = sum(1 for w in query_words if w in text_to_match)
+                sim = min(1.0, 0.5 + 0.1 * matched) if matched > 0 else 0.0
+                scores.append((sim, c))
 
         # Sort by similarity descending
         scores.sort(key=lambda x: x[0], reverse=True)

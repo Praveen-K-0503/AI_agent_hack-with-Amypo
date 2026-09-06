@@ -381,3 +381,14 @@ app.add_middleware(
 app.include_router(api_v1_router, prefix="/api/v1")
 from app.api.v1.qa_endpoints import router as qa_router
 app.include_router(qa_router, prefix="/api/v1")
+
+
+@app.get("/", tags=["Root"])
+def root():
+    return {
+        "status": "online",
+        "system": "AURA Autonomous AI Agent Safety & Permission Control System",
+        "version": "1.0.0",
+        "documentation": "/docs",
+        "health": "/api/v1/health"
+    }
